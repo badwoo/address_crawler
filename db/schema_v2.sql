@@ -3,7 +3,7 @@
 
 -- ============================================
 -- 1. bd 表（配置+跟踪）：由迁移脚本添加跟踪列
---    用户已有 bd(building_code VARCHAR PRIMARY KEY) 含 64万+ 数据
+--    
 --    migrate.py 会为其增加 crawl_status/error_msg/retry_count/updated_at
 -- ============================================
 
