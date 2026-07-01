@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深圳统一地址爬虫 - 监控看板</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, monospace;
+  background: #0d1117; color: #c9d1d9; padding: 24px;
+}
+.header {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.status-dot {
+  width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+}
+.status-dot.running { background: #2ea043; box-shadow: 0 0 8px #2ea043; animation: pulse 2s infinite; }
+.status-dot.idle { background: #d29922; }
+.status-dot.paused { background: #d29922; }
+.status-dot.done { background: #8b949e; }
+.status-dot.error { background: #f85149; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+h1 { font-size: 22px; font-weight: 600; color: #f0f6fc; }
+.elapsed { color: #8b949e; font-size: 14px; margin-left: auto; }
+.adaptive-badge {
+  background: #d29922; color: #0d1117; padding: 2px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 600; display: none;
+}
+.adaptive-badge.active { display: inline-block; }
+.grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px; margin-bottom: 24px;
+}
+.card {
+  background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+  padding: 16px; text-align: center;
+}
+.card .label { font-size: 12px; color: #8b949e; text-transform: uppercase; margin-bottom: 6px; }
+.card .value { font-size: 28px; font-weight: 700; }
+.card .value.success { color: #2ea043; }
+.card .value.failed { color: #f85149; }
+.card .value.rate { color: #58a6ff; }
+.progress-container { margin-bottom: 24px; }
+.progress-bar {
+  width: 100%; height: 24px; background: #161b22; border: 1px solid #30363d;
+  border-radius: 12px; overflow: hidden; position: relative;
+}
+.progress-fill {
+  height: 100%; background: linear-gradient(90deg, #238636, #2ea043);
+  border-radius: 12px; transition: width 0.5s;
+}
+.progress-text {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-size: 12px; font-weight: 600; color: #f0f6fc; white-space: nowrap;
+}
+.errors-section { margin-bottom: 24px; }
+.errors-section h2 { font-size: 16px; margin-bottom: 8px; color: #f85149; }
+.error-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  max-height: 300px; display: block; overflow-y: auto;
+}
+.error-table th, .error-table td {
+  padding: 8px 12px; text-align: left; border-bottom: 1px solid #21262d;
+}
+.error-table th { color: #8b949e; font-weight: 600; position: sticky; top: 0; background: #161b22; }
+.error-table td { color: #c9d1d9; }
+.error-table td.error-msg { color: #f85149; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.footer {
+  display: flex; gap: 24px; color: #8b949e; font-size: 13px;
+  border-top: 1px solid #21262d; padding-top: 16px; flex-wrap: wrap;
+}
+.refresh-note { color: #484f58; font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span id="statusDot" class="status-dot idle"></span>
+  <h1>深圳统一地址爬虫</h1>
+  <span id="statusText" style="font-size:14px;color:#8b949e;">就绪</span>
+  <span id="adaptiveBadge" class="adaptive-badge">⚠ 限速模式</span>
+  <span id="elapsed" class="elapsed">00:00:00</span>
+</div>
+
+<div class="grid">
+  <div class="card"><div class="label">待处理</div><div id="totalVal" class="value">--</div></div>
+  <div class="card"><div class="label">已处理</div><div id="processedVal" class="value rate">--</div></div>
+  <div class="card"><div class="label">成功</div><div id="successVal" class="value success">--</div></div>
+  <div class="card"><div class="label">失败</div><div id="failedVal" class="value failed">--</div></div>
+  <div class="card"><div class="label">速率</div><div id="rateVal" class="value rate">--</div></div>
+  <div class="card"><div class="label">当前延迟</div><div id="delayVal" class="value">--</div></div>
+  <div class="card"><div class="label">楼栋入库</div><div id="bcountVal" class="value">--</div></div>
+  <div class="card"><div class="label">房屋入库</div><div id="hcountVal" class="value">--</div></div>
+</div>
+
+<div class="progress-container">
+  <div class="progress-bar">
+    <div id="progressFill" class="progress-fill" style="width:0%"></div>
+    <div id="progressText" class="progress-text">0%</div>
+  </div>
+</div>
+
+<div class="errors-section">
+  <h2>最近错误</h2>
+  <table class="error-table">
+    <thead><tr><th>时间</th><th>Building Code</th><th>错误</th></tr></thead>
+    <tbody id="errorBody"><tr><td colspan="3" style="text-align:center;color:#484f58;">暂无错误</td></tr></tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <span id="dbStats">楼栋: -- | 房屋: --</span>
+  <span id="delayInfo">延迟倍率: 1.0x</span>
+  <span id="etaInfo">预计剩余: --</span>
+</div>
+<div class="refresh-note">每 {{REFRESH_INTERVAL}}ms 自动刷新 | 监控地址: <span id="monitorUrl"></span></div>
+
+<script>
+const REFRESH_MS = {{REFRESH_INTERVAL}};
+let startTime = 0;
+
+function fmtTime(secs) {
+  const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = Math.floor(secs%60);
+  return [h,m,s].map(v => String(v).padStart(2,'0')).join(':');
+}
+function fmtDuration(secs) {
+  if (!secs || secs<=0) return '--';
+  const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60);
+  if (h>0) return h+'h '+m+'m';
+  if (m>0) return m+'m';
+  return Math.floor(secs)+'s';
+}
+
+async function fetchStats() {
+  try {
+    const resp = await fetch('/api/stats');
+    const d = await resp.json();
+    updateUI(d);
+  } catch(e) {
+    document.getElementById('statusDot').className = 'status-dot error';
+    document.getElementById('statusText').textContent = '连接断开';
+  }
+}
+
+function updateUI(d) {
+  // 状态
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot ' + d.status;
+  const statusMap = {idle:'就绪',running:'运行中',paused:'已暂停',done:'已完成'};
+  document.getElementById('statusText').textContent = statusMap[d.status] || d.status;
+
+  // 自适应模式
+  const badge = document.getElementById('adaptiveBadge');
+  badge.className = 'adaptive-badge' + (d.adaptive_multiplier > 1.0 ? ' active' : '');
+  if (d.adaptive_multiplier > 1.0) {
+    badge.textContent = '⚠ 限速模式 ×' + d.adaptive_multiplier.toFixed(1);
+  }
+
+  // 已运行时间
+  if (d.status === 'running' && d.elapsed_seconds > 0) startTime = Date.now()/1000 - d.elapsed_seconds;
+  if (startTime > 0) {
+    document.getElementById('elapsed').textContent = fmtTime(Date.now()/1000 - startTime);
+  }
+
+  // 指标
+  document.getElementById('totalVal').textContent = d.total_pending || '--';
+  document.getElementById('processedVal').textContent = d.processed || 0;
+  document.getElementById('successVal').textContent = d.success || 0;
+  document.getElementById('failedVal').textContent = d.failed || 0;
+  document.getElementById('rateVal').textContent = (d.current_rate||0).toFixed(1) + '/s';
+  document.getElementById('delayVal').textContent = (d.current_delay||0).toFixed(1) + 's';
+  document.getElementById('bcountVal').textContent = d.buildings_count || '--';
+  document.getElementById('hcountVal').textContent = d.houses_count || '--';
+
+  // 进度条
+  const total = d.total_pending + d.processed;  // 估算总任务量
+  const pct = total > 0 ? (d.processed / total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = pct.toFixed(2) + '%';
+
+  // 错误表
+  const tbody = document.getElementById('errorBody');
+  if (d.recent_errors && d.recent_errors.length > 0) {
+    tbody.innerHTML = d.recent_errors.slice(-20).reverse().map(e =>
+      `<tr><td>${e.time}</td><td>${e.building_code}</td><td class="error-msg" title="${e.error}">${e.error}</td></tr>`
+    ).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#484f58;">暂无错误</td></tr>';
+  }
+
+  // 底部信息
+  document.getElementById('dbStats').textContent = '楼栋: '+(d.buildings_count||'--')+' | 房屋: '+(d.houses_count||'--');
+  document.getElementById('delayInfo').textContent = '延迟倍率: '+(d.adaptive_multiplier||1).toFixed(1)+'x';
+  document.getElementById('etaInfo').textContent = '预计剩余: '+fmtDuration(d.eta_seconds);
+  document.getElementById('monitorUrl').textContent = location.href;
+}
+
+// 初次加载 + 定时刷新
+fetchStats();
+setInterval(fetchStats, REFRESH_MS);
+// 每秒刷新已运行时间
+setInterval(() => {
+  if (startTime > 0) document.getElementById('elapsed').textContent = fmtTime(Date.now()/1000 - startTime);
+}, 1000);
+</script>
+</body>
+</html>

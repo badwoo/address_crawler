@@ -1,0 +1,67 @@
+# ============================================
+# 深圳统一地址爬虫 配置
+# ============================================
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: "YOUR_PASSWORD"
+  database: sz_address
+
+crawler:
+  # 并发 worker 数量 (保守起步，测试稳定后再调高)
+  concurrency: 2
+  # 每批从 bd 表取多少条 building_code
+  batch_size: 1000
+  # 重启时自动跳过已完成的 (基于 bd.crawl_status)
+  resume: true
+
+anti_bot:
+  # 请求间随机延迟范围 (秒)，worker 每次从 [min, max] 中随机取值
+  min_delay: 0.8
+  max_delay: 3.0
+  # 浏览器指纹列表 (每次请求随机选一个)
+  impersonate:
+    - chrome
+    - firefox
+    - safari
+    - edge
+  # 生成浏览器级 HTTP 头
+  stealthy_headers: true
+  # 额外请求头（会合并到 stealthy_headers 中），用于模拟站内来源
+  extra_headers:
+    Referer: "https://spatydz.sz.gov.cn/addrdatapc/standard/search"
+    Origin: "https://spatydz.sz.gov.cn"
+    Accept: "application/json, text/plain, */*"
+    Accept-Language: "zh-CN,zh;q=0.9"
+    Cache-Control: "no-cache"
+    Pragma: "no-cache"
+    Sec-Fetch-Dest: "empty"
+    Sec-Fetch-Mode: "cors"
+    Sec-Fetch-Site: "same-origin"
+  # 代理 (可选), 格式: "http://user:pass@host:port"
+  proxy: null
+  # 最大重试次数 (不含首次)
+  max_retries: 3
+  # 重试等待基数 (秒), 第N次重试等待: base * backoff^N
+  retry_base_delay: 5.0
+  retry_backoff: 2.0
+  # 自适应速率: 遇 403/429 减速, 连续成功后逐步恢复
+  adaptive_rate: true
+  # 延迟倍数上限 (秒), 防止无限增大
+  max_delay_cap: 60.0
+  # 连续成功 N 次后微微加速
+  success_threshold: 50
+  # 减速倍率 (遇限流时 delay *= factor)
+  rate_decrease_factor: 2.0
+  # 加速倍率 (持续成功时 delay *= factor)
+  rate_increase_factor: 0.9
+
+monitor:
+  # 启用监控 HTTP 服务
+  enabled: true
+  host: "0.0.0.0"
+  port: 8888
+  # 看板自动刷新间隔 (秒)
+  refresh_interval: 3

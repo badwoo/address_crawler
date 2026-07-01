@@ -1,0 +1,28 @@
+# Virtual environment
+venv/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+
+# Checkpoint files
+enumerator_checkpoint.json
+
+# OS files
+Thumbs.db
+.DS_Store
+nul
+=3.9.0
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
+.superpowers/

@@ -1,0 +1,4 @@
+scrapling[all]>=0.4.8
+asyncpg>=0.29.0
+pyyaml>=6.0
+aiohttp>=3.9.0
